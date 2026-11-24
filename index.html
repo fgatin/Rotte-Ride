@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rotte Ride – trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE  a cockpit: terse, legible at 2 m with sweat in your eyes
+IDEA   the head unit on a race bike: huge numbers, one profile strip
+PICTURE workout profile coloured by power zone with live power trace
+COLOUR night asphalt ground, zone colours, one orange accent
+TYPE   Barlow Condensed for numbers, Inter for labels
+*/
+:root{--bg:#0d1014;--panel:#161b22;--line:#262d37;--ink:#eef2f6;--dim:#8b96a5;--acc:#ff6a1a;--ok:#2fbf71;--bad:#ff4d4d}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-height:44px;cursor:pointer}
+button:hover{border-color:#3a4452}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#111;font-weight:600}
+button.on{border-color:var(--ok);color:var(--ok)}
+button:disabled{opacity:.4;cursor:default}
+input,select,textarea{background:#0b0e12;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:16px;width:100%}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px max(3vw,12px);border-bottom:1px solid var(--line)}
+header h1{font:700 24px 'Barlow Condensed',sans-serif;margin:0 auto 0 0;letter-spacing:.5px}
+header h1 b{color:var(--acc)}
+.dev{font-size:13px;color:var(--dim)}
+main{padding:12px max(3vw,12px);max-width:1300px;margin:auto}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.m{background:var(--panel);border-radius:12px;padding:8px 12px}
+.m small{color:var(--dim);font-size:13px}
+.m div{font:700 clamp(38px,6vw,64px)/1 'Barlow Condensed',sans-serif}
+.m div span{font-size:.4em;color:var(--dim);font-weight:500;margin-left:3px}
+.m.big div{color:var(--acc)}
+.m.tgt div{color:#ffd23f}
+.fig{position:relative;height:200px;margin:10px 0;background:var(--panel);border-radius:12px;overflow:hidden}
+.fig canvas{position:absolute;inset:0;width:100%;height:100%}
+.int{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin:4px 0 10px}
+.int b{font:700 28px 'Barlow Condensed',sans-serif}
+.int .dim{color:var(--dim)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px}
+@media(max-width:800px){.grid2{grid-template-columns:minmax(0,1fr)}}
+section.card{background:var(--panel);border-radius:12px;padding:14px}
+section.card h2{font:700 20px 'Barlow Condensed',sans-serif;margin:0 0 8px}
+label{display:block;font-size:13px;color:var(--dim);margin:8px 0 3px}
+.wlist{display:grid;gap:6px}
+.wlist button{text-align:left;display:flex;justify-content:space-between;gap:8px}
+.wlist button.sel{border-color:var(--acc)}
+.wlist span{color:var(--dim);font-size:13px;white-space:nowrap}
+textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:14px}
+.note{font-size:13px;color:var(--dim)}
+.msg{padding:10px 12px;border-radius:10px;background:#2a1a10;border:1px solid var(--acc);margin:8px 0;display:none}
+.msg.show{display:block}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}td.n{text-align:right;white-space:nowrap}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;max-width:520px;width:calc(100% - 24px)}
+dialog::backdrop{background:#000a}
+.sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.sum div{background:#0b0e12;border-radius:8px;padding:8px}.sum b{display:block;font:700 26px 'Barlow Condensed',sans-serif}
+code{background:#0b0e12;padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+input[type=range]{padding:0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>ROTTE <b>RIDE</b></h1>
+  <button id="btnTrainer">Connect trainer</button>
+  <button id="btnHr">Connect HR</button>
+  <button id="btnDemo" title="Simulated trainer for testing">Demo</button>
+  <span class="dev" id="devState">No devices</span>
+</header>
+<main>
+  <div class="msg" id="msg"></div>
+
+  <div class="metrics">
+    <div class="m big"><small>Power</small><div id="vPow">–<span>W</span></div></div>
+    <div class="m tgt"><small id="tgtLbl">Target</small><div id="vTgt">–<span>W</span></div></div>
+    <div class="m"><small>Cadence</small><div id="vCad">–<span>rpm</span></div></div>
+    <div class="m"><small>Heart rate</small><div id="vHr">–<span>bpm</span></div></div>
+    <div class="m"><small>Elapsed</small><div id="vTime">0:00</div></div>
+    <div class="m"><small>Distance</small><div id="vDist">0.0<span>km</span></div></div>
+  </div>
+
+  <div class="fig"><canvas id="cv"></canvas></div>
+
+  <div class="int">
+    <span class="dim">Interval</span><b id="iName">–</b>
+    <span class="dim">left</span><b id="iLeft">–</b>
+    <span class="dim">next</span><b id="iNext">–</b>
+    <span class="dim">avg</span><b id="vAvg">–</b>
+  </div>
+
+  <div class="row">
+    <button class="pri" id="btnStart">Start ride</button>
+    <button id="btnPause" disabled>Pause</button>
+    <button id="btnSkip" disabled>Skip interval</button>
+    <button id="btnFinish" disabled>Finish</button>
+    <span style="flex:1"></span>
+    <button id="btnErg" class="on">ERG</button>
+    <button id="btnSim">Slope</button>
+  </div>
+  <div class="row" id="ergCtl">
+    <span class="note">Intensity</span>
+    <button data-bias="-5">−5%</button><b id="vBias">100%</b><button data-bias="5">+5%</button>
+    <span class="note" style="margin-left:12px">Free-ride target</span>
+    <button data-w="-10">−10 W</button><button data-w="10">+10 W</button>
+  </div>
+  <div class="row" id="simCtl" hidden>
+    <span class="note">Grade</span>
+    <input type="range" id="grade" min="-5" max="15" step="0.5" value="0" style="max-width:320px">
+    <b id="vGrade">0.0%</b>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Workout</h2>
+      <label for="ftp">FTP (W)</label>
+      <input id="ftp" type="number" min="50" max="600" value="250" style="max-width:140px">
+      <div class="wlist" id="wlist" style="margin-top:10px"></div>
+      <label for="custom">Custom workout — one block per line</label>
+      <textarea id="custom" spellcheck="false">10m 45-75%
+3x 8m 92%, 4m 55%
+5m free
+8m 70-45%</textarea>
+      <div class="row">
+        <button id="btnCustom">Load custom</button>
+        <label class="note" style="margin:0"><input type="file" id="zwo" accept=".zwo,.xml" hidden><span role="button" tabindex="0" id="zwoBtn" style="display:inline-block;border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;color:var(--ink)">Import .zwo</span></label>
+      </div>
+      <p class="note">Syntax: <code>10m 60%</code> steady · <code>10m 50-75%</code> ramp · <code>4x 3m 115%, 3m 50%</code> repeats · <code>200w</code> absolute · <code>5m free</code> free ride · durations <code>30s</code>, <code>4m30s</code>, <code>1h</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>Strava</h2>
+      <p class="note" id="stStatus">Not connected.</p>
+      <label for="cid">Client ID</label><input id="cid" autocomplete="off">
+      <label for="csec">Client secret</label><input id="csec" type="password" autocomplete="off">
+      <div class="row"><button id="btnStrava">Connect Strava</button><button id="btnStravaOff">Disconnect</button></div>
+      <div id="codeBox" hidden>
+        <label for="code">Paste the <code>code=</code> value (or the whole URL) from the address bar after authorising</label>
+        <input id="code" autocomplete="off"><div class="row"><button id="btnCode" class="pri">Finish connecting</button></div>
+      </div>
+      <p class="note">Create an app at <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener" style="color:var(--acc)">strava.com/settings/api</a>. Set <b>Authorization Callback Domain</b> to <code id="cbDomain"></code>.</p>
+
+      <h2 style="margin-top:14px">Rides on this device</h2>
+      <table><tbody id="hist"><tr><td class="note">No rides yet.</td></tr></tbody></table>
+    </section>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <h2 style="font:700 26px 'Barlow Condensed',sans-serif;margin:0">Ride finished</h2>
+  <div class="sum" id="sum"></div>
+  <label for="rideName">Activity name</label><input id="rideName">
+  <div class="row">
+    <button class="pri" id="btnUp">Upload to Strava</button>
+    <button id="btnTcx">Download TCX</button>
+    <button id="btnClose">Close</button>
+  </div>
+  <p class="note" id="upState"></p>
+</dialog>
+
+<script>
+{
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('rr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('rr_' + k, JSON.stringify(v)); return true; } catch { return false; } }
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(x).padStart(2,'0'); };
+const msg = (t) => { const m = $('msg'); m.textContent = t || ''; m.classList.toggle('show', !!t); };
+const zoneCol = f => f < .6 ? '#7f8a99' : f < .76 ? '#3b8dff' : f < .9 ? '#2fbf71' : f < 1.05 ? '#ffd23f' : f < 1.19 ? '#ff8a1f' : '#ff4d4d';
+
+/* ---------- state ---------- */
+const S = {
+  ftp: store.get('ftp', 250), bias: 1, mode: 'erg', grade: 0, freeTarget: 150,
+  power: 0, cadence: 0, speed: 0, hr: 0,
+  running: false, paused: false, elapsed: 0, dist: 0, samples: [],
+  workout: null, skipOffset: 0, lastSent: null, startTime: null
+};
+$('ftp').value = S.ftp;
+$('ftp').onchange = e => { S.ftp = Math.max(50, +e.target.value || 250); store.set('ftp', S.ftp); draw(); };
+
+/* ---------- workouts ---------- */
+// segment: {dur, from, to, abs?, free?, label}
+const seg = (dur, from, to = from, label = '') => ({ dur, from, to, label });
+const rep = (n, ...parts) => Array.from({length: n}, () => parts.map(p => ({...p}))).flat();
+const ramp = []; for (let i = 0; i < 30; i++) ramp.push(seg(60, .4 + i*.06, .4 + i*.06, 'Ramp ' + (i+1)));
+const BUILTIN = [
+  { name: 'Free ride', segs: [{dur: 4*3600, free: true, label: 'Free ride'}] },
+  { name: 'Endurance 60', segs: [seg(600,.45,.65,'Warm-up'), seg(2400,.68,.68,'Endurance'), seg(600,.65,.45,'Cool-down')] },
+  { name: 'Sweet spot 3×10', segs: [seg(600,.5,.75,'Warm-up'), ...rep(3, seg(600,.9,.9,'Sweet spot'), seg(300,.55,.55,'Recover')), seg(600,.65,.45,'Cool-down')] },
+  { name: 'Threshold 2×20', segs: [seg(600,.5,.75,'Warm-up'), seg(180,1,1,'Opener'), seg(240,.55,.55,'Easy'), ...rep(2, seg(1200,.97,.97,'Threshold'), seg(300,.55,.55,'Recover')), seg(600,.65,.45,'Cool-down')] },
+  { name: 'VO2max 5×3', segs: [seg(900,.5,.75,'Warm-up'), ...rep(5, seg(180,1.15,1.15,'VO2'), seg(180,.5,.5,'Recover')), seg(600,.6,.4,'Cool-down')] },
+  { name: '30/30s 2×8', segs: [seg(600,.5,.75,'Warm-up'), ...rep(8, seg(30,1.3,1.3,'On'), seg(30,.5,.5,'Off')), seg(300,.55,.55,'Between sets'), ...rep(8, seg(30,1.3,1.3,'On'), seg(30,.5,.5,'Off')), seg(600,.6,.4,'Cool-down')] },
+  { name: 'Ramp test (FTP)', ramp: true, segs: [seg(300,.4,.4,'Easy'), ...ramp] }
+];
+
+function parseDur(s) {
+  const m = s.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
+  if (!m || !s) return null;
+  return (+(m[1]||0))*3600 + (+(m[2]||0))*60 + (+(m[3]||0));
+}
+function parseBlock(txt) {
+  const p = txt.trim().split(/\s+/); if (p.length < 2) throw new Error('Cannot read "' + txt + '"');
+  const dur = parseDur(p[0]); if (!dur) throw new Error('Bad duration in "' + txt + '"');
+  const v = p[1].toLowerCase();
+  if (v === 'free') return {dur, free: true, label: 'Free ride'};
+  let m = v.match(/^(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?(%|w)$/);
+  if (!m) throw new Error('Bad target in "' + txt + '"');
+  const a = +m[1], b = m[2] ? +m[2] : a;
+  if (m[3] === 'w') return {dur, from: a, to: b, abs: true, label: p.slice(2).join(' ')};
+  return seg(dur, a/100, b/100, p.slice(2).join(' '));
+}
+function parseCustom(text) {
+  const out = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim(); if (!line || line.startsWith('#')) continue;
+    const r = line.match(/^(\d+)\s*x\s+(.+)$/i);
+    if (r) { const parts = r[2].split(',').map(parseBlock); out.push(...rep(+r[1], ...parts)); }
+    else out.push(parseBlock(line));
+  }
+  if (!out.length) throw new Error('Empty workout');
+  return out;
+}
+function parseZwo(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const w = doc.querySelector('workout'); if (!w) throw new Error('No <workout> in file');
+  const n = (el, a, d = 0) => { const v = el.getAttribute(a) ?? el.getAttribute(a.toLowerCase()); return v == null ? d : +v; };
+  const segs = [];
+  for (const el of w.children) {
+    const t = el.tagName.toLowerCase(), d = n(el, 'Duration');
+    if (t === 'warmup' || t === 'cooldown' || t === 'ramp') segs.push(seg(d, n(el,'PowerLow'), n(el,'PowerHigh'), t === 'warmup' ? 'Warm-up' : t === 'cooldown' ? 'Cool-down' : 'Ramp'));
+    else if (t === 'steadystate') segs.push(seg(d, n(el,'Power'), n(el,'Power'), 'Steady'));
+    else if (t === 'intervalst') segs.push(...rep(n(el,'Repeat',1), seg(n(el,'OnDuration'), n(el,'OnPower'), n(el,'OnPower'), 'On'), seg(n(el,'OffDuration'), n(el,'OffPower'), n(el,'OffPower'), 'Off')));
+    else if (t === 'freeride' || t === 'maxeffort') segs.push({dur: d, free: true, label: t === 'maxeffort' ? 'Max effort' : 'Free ride'});
+  }
+  if (!segs.length) throw new Error('No blocks found in .zwo');
+  return { name: doc.querySelector('name')?.textContent?.trim() || 'Imported workout', segs };
+}
+
+function setWorkout(w) {
+  if (S.running) { msg('Finish the current ride before switching workout.'); return; }
+  let t = 0; w.segs.forEach(s => { s.start = t; t += s.dur; }); w.total = t;
+  S.workout = w; S.skipOffset = 0; msg(''); renderList(); draw(); updateInterval();
+}
+function wTotal(w) { return w.segs.reduce((a, s) => a + s.dur, 0); }
+let customW = null;
+function renderList() {
+  const all = customW ? [...BUILTIN, customW] : BUILTIN;
+  $('wlist').innerHTML = all.map((w, i) => `<button data-i="${i}" class="${S.workout && S.workout.name === w.name ? 'sel' : ''}">${esc(w.name)}<span>${w.segs[0].free && w.segs.length === 1 ? 'open' : fmt(wTotal(w))}</span></button>`).join('');
+  $('wlist').querySelectorAll('button').forEach(b => b.onclick = () => setWorkout(structuredClone(all[+b.dataset.i])));
+}
+$('btnCustom').onclick = () => { try { customW = { name: 'Custom workout', segs: parseCustom($('custom').value) }; store.set('custom', $('custom').value); setWorkout(structuredClone(customW)); } catch (e) { msg(e.message); } };
+$('custom').value = store.get('custom', $('custom').value);
+$('zwoBtn').onclick = () => $('zwo').click();
+$('zwoBtn').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('zwo').click(); } };
+$('zwo').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { customW = parseZwo(await f.text()); setWorkout(structuredClone(customW)); } catch (err) { msg(err.message); } e.target.value = ''; };
+
+/* ---------- target logic ---------- */
+function curSeg() {
+  const w = S.workout; if (!w) return null;
+  const t = S.elapsed + S.skipOffset;
+  for (let i = 0; i < w.segs.length; i++) { const s = w.segs[i]; if (t < s.start + s.dur) return { s, i, into: t - s.start }; }
+  return null;
+}
+function targetWatts() {
+  const c = curSeg();
+  if (!c || c.s.free) return Math.round(S.freeTarget * S.bias);
+  const f = c.s.from + (c.s.to - c.s.from) * (c.into / c.s.dur);
+  return Math.round((c.s.abs ? f : f * S.ftp) * S.bias);
+}
+
+/* ---------- BLE: FTMS trainer + HR ---------- */
+const FTMS = 0x1826, BIKE_DATA = 0x2ad2, CTRL = 0x2ad9, HRS = 0x180d, HRM = 0x2a37;
+let ctrlChar = null, trainerDev = null, hrDev = null, demo = null, gattQ = Promise.resolve();
+const queue = fn => (gattQ = gattQ.then(fn).catch(e => console.warn('GATT', e)));
+
+function bleOk() {
+  if (!navigator.bluetooth) { msg('This browser has no Web Bluetooth. Use Chrome or Edge on a computer or Android, or the Bluefy browser on iPhone, and open the page over https.'); return false; }
+  return true;
+}
+function devState() {
+  const p = [];
+  if (demo) p.push('Demo trainer'); else if (trainerDev) p.push((trainerDev.name || 'Trainer') + ' ✓');
+  if (hrDev) p.push((hrDev.name || 'HR') + ' ✓');
+  $('devState').textContent = p.join(' · ') || 'No devices';
+  $('btnTrainer').classList.toggle('on', !!trainerDev); $('btnHr').classList.toggle('on', !!hrDev); $('btnDemo').classList.toggle('on', !!demo);
+}
+
+function parseBikeData(dv) {
+  let o = 0; const fl = dv.getUint16(o, true); o += 2; const r = {};
+  if (!(fl & 1)) { r.speed = dv.getUint16(o, true) / 100; o += 2; }
+  if (fl & 2) o += 2;
+  if (fl & 4) { r.cadence = dv.getUint16(o, true) / 2; o += 2; }
+  if (fl & 8) o += 2;
+  if (fl & 16) o += 3;
+  if (fl & 32) o += 2;
+  if (fl & 64) { r.power = dv.getInt16(o, true); o += 2; }
+  if (fl & 128) o += 2;
+  if (fl & 256) o += 5;
+  if (fl & 512) { r.hr = dv.getUint8(o); o += 1; }
+  return r;
+}
+async function ctrl(bytes) {
+  if (demo) return;
+  if (!ctrlChar) return;
+  return queue(() => (ctrlChar.writeValueWithResponse ? ctrlChar.writeValueWithResponse(new Uint8Array(bytes)) : ctrlChar.writeValue(new Uint8Array(bytes))));
+}
+const setPower = w => { const v = Math.max(0, Math.min(2000, w)); return ctrl([0x05, v & 0xff, (v >> 8) & 0xff]); };
+const setGrade = g => { const v = Math.round(g * 100) & 0xffff; return ctrl([0x11, 0, 0, v & 0xff, v >> 8, 40, 51]); }; // wind 0, grade 0.01%, Crr .004, CwA .51
+
+async function connectTrainer() {
+  if (!bleOk()) return;
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [FTMS] }], optionalServices: [FTMS] });
+    const srv = await (await dev.gatt.connect()).getPrimaryService(FTMS);
+    const data = await srv.getCharacteristic(BIKE_DATA);
+    ctrlChar = await srv.getCharacteristic(CTRL);
+    await ctrlChar.startNotifications();
+    await data.startNotifications();
+    data.addEventListener('characteristicvaluechanged', e => onData(parseBikeData(e.target.value)));
+    dev.addEventListener('gattserverdisconnected', () => { trainerDev = null; ctrlChar = null; devState(); msg('Trainer disconnected — press Connect trainer to reconnect. Your ride is still recording.'); });
+    await ctrl([0x00]); await ctrl([0x07]);
+    trainerDev = dev; demo = null; S.lastSent = null; devState(); msg(''); applyMode();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return;
+    msg(e.name === 'SecurityError' ? 'Bluetooth is blocked here. Open the page directly in its own Chrome tab (https or localhost).' : 'Trainer: ' + e.message);
+  }
+}
+async function connectHr() {
+  if (!bleOk()) return;
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [HRS] }] });
+    const ch = await (await (await dev.gatt.connect()).getPrimaryService(HRS)).getCharacteristic(HRM);
+    await ch.startNotifications();
+    ch.addEventListener('characteristicvaluechanged', e => { const v = e.target.value; S.hr = (v.getUint8(0) & 1) ? v.getUint16(1, true) : v.getUint8(1); S.hrStrap = true; });
+    dev.addEventListener('gattserverdisconnected', () => { hrDev = null; S.hrStrap = false; devState(); });
+    hrDev = dev; devState();
+  } catch (e) { if (e.name !== 'NotFoundError') msg('Heart rate: ' + e.message); }
+}
+function onData(r) {
+  if (r.power != null) S.power = Math.max(0, r.power);
+  if (r.cadence != null) S.cadence = r.cadence;
+  if (r.speed != null) S.speed = r.speed;
+  if (r.hr && !S.hrStrap) S.hr = r.hr;
+}
+function toggleDemo() {
+  if (demo) { clearInterval(demo); demo = null; devState(); return; }
+  trainerDev = null; ctrlChar = null;
+  demo = setInterval(() => {
+    const tgt = S.mode === 'erg' ? targetWatts() : 120 + S.grade * 18;
+    S.power += (tgt - S.power) * .35 + (Math.random() - .5) * 12;
+    S.cadence = 88 + (Math.random() - .5) * 6;
+    S.speed = speedFromPower(S.power) * 3.6;
+    if (!S.hrStrap) S.hr = Math.round(95 + S.power / 4 + (Math.random() - .5) * 2);
+  }, 500);
+  devState();
+}
+function speedFromPower(p) { let v = 8; for (let i = 0; i < 20; i++) { const f = 0.5*1.225*0.32*v**3 + 0.004*80*9.81*v - p; v -= f / (1.5*1.225*0.32*v**2 + 0.004*80*9.81); v = Math.max(0.1, v); } return p > 0 ? v : 0; }
+
+$('btnTrainer').onclick = connectTrainer; $('btnHr').onclick = connectHr; $('btnDemo').onclick = toggleDemo;
+
+/* ---------- modes ---------- */
+function applyMode() {
+  $('btnErg').classList.toggle('on', S.mode === 'erg'); $('btnSim').classList.toggle('on', S.mode === 'sim');
+  $('ergCtl').hidden = S.mode !== 'erg'; $('simCtl').hidden = S.mode !== 'sim';
+  $('tgtLbl').textContent = S.mode === 'erg' ? 'Target' : 'Grade';
+  S.lastSent = null;
+  if (S.mode === 'sim') setGrade(S.grade);
+}
+$('btnErg').onclick = () => { S.mode = 'erg'; applyMode(); };
+$('btnSim').onclick = () => { S.mode = 'sim'; applyMode(); };
+$('grade').oninput = e => { S.grade = +e.target.value; $('vGrade').textContent = S.grade.toFixed(1) + '%'; setGrade(S.grade); };
+document.querySelectorAll('[data-bias]').forEach(b => b.onclick = () => { S.bias = Math.max(.5, Math.min(1.5, S.bias + b.dataset.bias / 100)); $('vBias').textContent = Math.round(S.bias * 100) + '%'; });
+document.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { S.freeTarget = Math.max(50, S.freeTarget + +b.dataset.w); });
+
+/* ---------- ride control ---------- */
+let wake = null;
+async function keepAwake() { try { wake = await navigator.wakeLock?.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => { if (S.running && document.visibilityState === 'visible') keepAwake(); });
+
+$('btnStart').onclick = () => {
+  if (!trainerDev && !demo) { msg('Connect your trainer first (or press Demo to try it out).'); return; }
+  if (!S.workout) setWorkout(structuredClone(BUILTIN[0]));
+  Object.assign(S, { running: true, paused: false, elapsed: 0, dist: 0, samples: [], skipOffset: 0, lastSent: null, startTime: new Date() });
+  $('btnStart').disabled = true; ['btnPause','btnSkip','btnFinish'].forEach(id => $(id).disabled = false);
+  $('btnPause').textContent = 'Pause'; keepAwake(); msg('');
+};
+$('btnPause').onclick = () => { S.paused = !S.paused; $('btnPause').textContent = S.paused ? 'Resume' : 'Pause'; };
+$('btnSkip').onclick = () => { const c = curSeg(); if (c) S.skipOffset += c.s.dur - c.into; };
+$('btnFinish').onclick = finish;
+
+function tick() {
+  if (S.running && !S.paused) {
+    S.elapsed++;
+    S.dist += (S.speed / 3.6);
+    const tgt = S.mode === 'erg' ? targetWatts() : null;
+    S.samples.push({ t: Date.now(), p: Math.round(S.power), c: Math.round(S.cadence), s: +S.speed.toFixed(2), h: S.hr || 0, d: Math.round(S.dist), g: tgt, wt: S.elapsed + S.skipOffset });
+    const w = S.workout;
+    if (w && !(w.segs.length === 1 && w.segs[0].free) && S.elapsed + S.skipOffset >= w.total) finish();
+  }
+  if (S.mode === 'erg' && (S.running || trainerDev)) {
+    const tgt = targetWatts();
+    if (tgt !== S.lastSent) { S.lastSent = tgt; setPower(tgt); }
+  }
+  render();
+}
+setInterval(tick, 1000);
+
+/* ---------- render ---------- */
+function render() {
+  $('vPow').innerHTML = Math.round(S.power) + '<span>W</span>';
+  $('vTgt').innerHTML = S.mode === 'erg' ? targetWatts() + '<span>W</span>' : S.grade.toFixed(1) + '<span>%</span>';
+  $('vCad').innerHTML = Math.round(S.cadence) + '<span>rpm</span>';
+  $('vHr').innerHTML = (S.hr || '–') + '<span>bpm</span>';
+  $('vTime').textContent = fmt(S.elapsed);
+  $('vDist').innerHTML = (S.dist / 1000).toFixed(1) + '<span>km</span>';
+  const n = S.samples.length; $('vAvg').textContent = n ? Math.round(S.samples.reduce((a, s) => a + s.p, 0) / n) + ' W' : '–';
+  updateInterval(); draw();
+}
+function updateInterval() {
+  const c = curSeg(), w = S.workout;
+  if (!c) { $('iName').textContent = w ? 'Done' : '–'; $('iLeft').textContent = '–'; $('iNext').textContent = '–'; return; }
+  $('iName').textContent = c.s.label || (c.s.free ? 'Free ride' : 'Interval');
+  $('iLeft').textContent = fmt(c.s.dur - c.into);
+  const nx = w.segs[c.i + 1];
+  $('iNext').textContent = nx ? (nx.free ? 'free' : nx.abs ? Math.round(nx.from) + ' W' : Math.round(nx.from * S.ftp * S.bias) + ' W') + ' · ' + fmt(nx.dur) : 'finish';
+}
+const cv = $('cv'), ctx = cv.getContext('2d');
+function draw() {
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const w = S.workout, openRide = !w || (w.segs.length === 1 && w.segs[0].free);
+  const span = openRide ? Math.max(600, S.elapsed + 60) : w.total;
+  const t0 = openRide ? Math.max(0, S.elapsed - 600) : 0, tSpan = openRide ? 660 : span;
+  const maxW = Math.max(S.ftp * 1.6, ...S.samples.slice(-900).map(s => s.p), 100);
+  const x = t => (t - t0) / tSpan * W, y = p => H - 4 - (p / maxW) * (H - 14);
+  if (!openRide) for (const s of w.segs) {
+    const fa = s.free ? .5 : s.abs ? s.from / S.ftp : s.from, fb = s.free ? .5 : s.abs ? s.to / S.ftp : s.to;
+    ctx.fillStyle = s.free ? '#3a4452' : zoneCol((fa + fb) / 2); ctx.globalAlpha = .55;
+    ctx.beginPath(); ctx.moveTo(x(s.start), H); ctx.lineTo(x(s.start), y(fa * S.ftp * S.bias)); ctx.lineTo(x(s.start + s.dur), y(fb * S.ftp * S.bias)); ctx.lineTo(x(s.start + s.dur), H); ctx.fill();
+  }
+  ctx.globalAlpha = .35; ctx.strokeStyle = '#fff'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, y(S.ftp)); ctx.lineTo(W, y(S.ftp)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.globalAlpha = 1; ctx.fillStyle = '#8b96a5'; ctx.font = '12px Inter'; ctx.fillText('FTP ' + S.ftp, 6, y(S.ftp) - 4);
+  // actual power, plotted against workout time (elapsed + skips approximated by sample index)
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath();
+  const off = S.skipOffset; let prev = -1e9, first = true;
+  S.samples.forEach((s, i) => { const t = openRide ? i + 1 : s.wt; if (t < t0) return; if (first || t - prev > 2) ctx.moveTo(x(t), y(s.p)); else ctx.lineTo(x(t), y(s.p)); prev = t; first = false; });
+  ctx.stroke();
+  const now = S.elapsed + (openRide ? 0 : off); ctx.fillStyle = '#ff6a1a'; ctx.fillRect(x(now) - 1, 0, 2, H);
+}
+new ResizeObserver(draw).observe(cv);
+
+/* ---------- stats, TCX ---------- */
+function stats(r) {
+  const p = r.samples.map(s => s.p), n = p.length || 1;
+  const avg = p.reduce((a, b) => a + b, 0) / n;
+  let np = avg; if (p.length >= 30) { const roll = []; let acc = 0; p.forEach((v, i) => { acc += v; if (i >= 30) acc -= p[i - 30]; if (i >= 29) roll.push((acc / 30) ** 4); }); np = (roll.reduce((a, b) => a + b, 0) / roll.length) ** .25; }
+  const hrs = r.samples.map(s => s.h).filter(Boolean);
+  const kj = p.reduce((a, b) => a + b, 0) / 1000;
+  let best60 = 0; for (let i = 0, acc = 0; i < p.length; i++) { acc += p[i]; if (i >= 60) acc -= p[i - 60]; if (i >= 59) best60 = Math.max(best60, acc / 60); }
+  return { dur: r.samples.length, avg: Math.round(avg), np: Math.round(np), kj: Math.round(kj), hr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : 0,
+    dist: r.samples.length ? r.samples[r.samples.length - 1].d : 0, tss: Math.round(r.samples.length * np * (np / r.ftp) / (r.ftp * 3600) * 100), best60: Math.round(best60) };
+}
+function tcx(r) {
+  const st = stats(r), iso = t => new Date(t).toISOString();
+  const pts = r.samples.map(s => `<Trackpoint><Time>${iso(s.t)}</Time><DistanceMeters>${s.d}</DistanceMeters>${s.h ? `<HeartRateBpm><Value>${s.h}</Value></HeartRateBpm>` : ''}<Cadence>${Math.min(254, s.c)}</Cadence><Extensions><ns3:TPX><ns3:Speed>${(s.s / 3.6).toFixed(2)}</ns3:Speed><ns3:Watts>${s.p}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>`).join('\n');
+  const start = iso(r.samples[0]?.t || r.start);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
+<Activities><Activity Sport="Biking"><Id>${start}</Id><Lap StartTime="${start}"><TotalTimeSeconds>${st.dur}</TotalTimeSeconds><DistanceMeters>${st.dist}</DistanceMeters><Calories>${st.kj}</Calories>${st.hr ? `<AverageHeartRateBpm><Value>${st.hr}</Value></AverageHeartRateBpm>` : ''}<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>
+${pts}
+</Track></Lap><Creator xsi:type="Device_t" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Name>Rotte Ride</Name></Creator></Activity></Activities></TrainingCenterDatabase>`;
+}
+function downloadTcx(r) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([tcx(r)], { type: 'application/xml' }));
+  a.download = 'ride-' + new Date(r.start).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.tcx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------- history ---------- */
+let rides = store.get('rides', []);
+function saveRides() { while (rides.length && !store.set('rides', rides)) rides.shift(); }
+function renderHist() {
+  if (!rides.length) { $('hist').innerHTML = '<tr><td class="note">No rides yet.</td></tr>'; return; }
+  $('hist').innerHTML = rides.slice().reverse().map(r => { const st = stats(r);
+    return `<tr><td>${esc(new Date(r.start).toLocaleDateString())}<br><span class="note">${esc(r.name)}</span></td><td class="n">${fmt(st.dur)}<br>${st.avg} W</td><td class="n">${r.stravaId ? `<a href="https://www.strava.com/activities/${encodeURIComponent(r.stravaId)}" target="_blank" rel="noopener" style="color:var(--ok)">On Strava</a>` : `<button data-open="${esc(r.id)}">Open</button>`}</td></tr>`; }).join('');
+  $('hist').querySelectorAll('[data-open]').forEach(b => b.onclick = () => openRide(rides.find(r => r.id === b.dataset.open)));
+}
+
+let current = null;
+function finish() {
+  if (!S.running) return;
+  S.running = false; try { wake?.release(); } catch {}
+  $('btnStart').disabled = false; ['btnPause','btnSkip','btnFinish'].forEach(id => $(id).disabled = true);
+  if (S.samples.length < 10) { msg('Ride was too short to save.'); return; }
+  const r = { id: String(Date.now()), start: S.startTime.toISOString(), name: (S.workout?.name || 'Indoor ride') + ' – Rotte Ride', ftp: S.ftp, samples: S.samples, ramp: !!S.workout?.ramp };
+  rides.push(r); if (rides.length > 15) rides.shift(); saveRides(); renderHist(); openRide(r);
+}
+function openRide(r) {
+  current = r; const st = stats(r);
+  const cells = [['Time', fmt(st.dur)], ['Avg power', st.avg + ' W'], ['NP', st.np + ' W'], ['Work', st.kj + ' kJ'], ['Avg HR', st.hr || '–'], ['TSS', st.tss]];
+  if (r.ramp) cells.push(['FTP estimate', Math.round(st.best60 * .75) + ' W']);
+  $('sum').innerHTML = cells.map(([k, v]) => `<div><span class="note">${k}</span><b>${esc(v)}</b></div>`).join('');
+  $('rideName').value = r.name; $('upState').textContent = r.stravaId ? 'Already uploaded.' : '';
+  $('dlg').showModal();
+}
+$('btnClose').onclick = () => $('dlg').close();
+$('btnTcx').onclick = () => current && downloadTcx(current);
+$('rideName').onchange = e => { if (current) { current.name = e.target.value; saveRides(); renderHist(); } };
+
+/* ---------- Strava ---------- */
+const httpsHosted = location.protocol === 'https:' || location.hostname === 'localhost';
+const redirectUri = httpsHosted ? location.origin + location.pathname : 'http://localhost';
+$('cbDomain').textContent = httpsHosted ? location.hostname : 'localhost';
+$('cid').value = store.get('cid', ''); $('csec').value = store.get('csec', '');
+let tok = store.get('tok', null);
+function stStatus() { $('stStatus').textContent = tok ? 'Connected as ' + (tok.athlete || 'athlete') + '.' : 'Not connected.'; }
+async function tokenReq(params) {
+  const body = new URLSearchParams({ client_id: $('cid').value.trim(), client_secret: $('csec').value.trim(), ...params });
+  const res = await fetch('https://www.strava.com/oauth/token', { method: 'POST', body });
+  const j = await res.json(); if (!res.ok) throw new Error(j.message || 'Strava token error');
+  tok = { access: j.access_token, refresh: j.refresh_token, exp: j.expires_at, athlete: j.athlete ? (j.athlete.firstname + ' ' + j.athlete.lastname).trim() : tok?.athlete };
+  store.set('tok', tok); stStatus();
+}
+async function accessToken() {
+  if (!tok) throw new Error('Connect Strava first (right-hand panel).');
+  if (Date.now() / 1000 > tok.exp - 120) await tokenReq({ grant_type: 'refresh_token', refresh_token: tok.refresh });
+  return tok.access;
+}
+$('btnStrava').onclick = () => {
+  const id = $('cid').value.trim(); if (!id || !$('csec').value.trim()) { msg('Enter your Strava Client ID and secret first.'); return; }
+  store.set('cid', id); store.set('csec', $('csec').value.trim());
+  const url = 'https://www.strava.com/oauth/authorize?' + new URLSearchParams({ client_id: id, response_type: 'code', redirect_uri: redirectUri, approval_prompt: 'auto', scope: 'activity:write,read' });
+  if (httpsHosted) location.href = url; else { window.open(url, '_blank'); $('codeBox').hidden = false; }
+};
+$('btnCode').onclick = async () => {
+  let c = $('code').value.trim(); const m = c.match(/code=([^&\s]+)/); if (m) c = m[1];
+  try { await tokenReq({ code: c, grant_type: 'authorization_code' }); $('codeBox').hidden = true; msg(''); } catch (e) { msg('Strava: ' + e.message); }
+};
+$('btnStravaOff').onclick = () => { tok = null; store.set('tok', null); stStatus(); };
+(async () => {
+  const q = new URLSearchParams(location.search);
+  if (q.get('code')) { history.replaceState(null, '', location.pathname);
+    try { await tokenReq({ code: q.get('code'), grant_type: 'authorization_code' }); msg(''); } catch (e) { msg('Strava: ' + e.message); } }
+  else if (q.get('error')) { history.replaceState(null, '', location.pathname); msg('Strava access was not granted.'); }
+})();
+
+$('btnUp').onclick = async () => {
+  const r = current; if (!r) return; const up = $('upState');
+  try {
+    up.textContent = 'Uploading…';
+    const fd = new FormData();
+    fd.append('file', new Blob([tcx(r)], { type: 'application/xml' }), 'ride.tcx');
+    fd.append('data_type', 'tcx'); fd.append('name', r.name); fd.append('trainer', '1'); fd.append('external_id', 'rotteride-' + r.id);
+    fd.append('description', 'Indoor ride on Tacx Flux 2 · FTP ' + r.ftp + ' W');
+    const at = await accessToken();
+    let res = await fetch('https://www.strava.com/api/v3/uploads', { method: 'POST', headers: { Authorization: 'Bearer ' + at }, body: fd });
+    let j = await res.json(); if (!res.ok) throw new Error(j.message || j.error || 'upload failed');
+    for (let i = 0; i < 20 && !j.activity_id && !j.error; i++) {
+      await new Promise(ok => setTimeout(ok, 2000)); up.textContent = 'Strava is processing…';
+      j = await (await fetch('https://www.strava.com/api/v3/uploads/' + j.id_str, { headers: { Authorization: 'Bearer ' + at } })).json();
+    }
+    if (j.error) throw new Error(j.error);
+    if (!j.activity_id) { up.textContent = 'Uploaded — Strava is still processing it.'; return; }
+    r.stravaId = String(j.activity_id); saveRides(); renderHist();
+    up.innerHTML = 'Done — <a style="color:var(--ok)" target="_blank" rel="noopener" href="https://www.strava.com/activities/' + encodeURIComponent(r.stravaId) + '">open on Strava</a>.';
+  } catch (e) { up.textContent = 'Upload failed: ' + e.message + '. You can download the TCX and upload it at strava.com/upload/select.'; }
+};
+
+/* ---------- init ---------- */
+window.addEventListener('beforeunload', e => { if (S.running) { e.preventDefault(); e.returnValue = ''; } });
+stStatus(); renderList(); renderHist(); setWorkout(structuredClone(BUILTIN[0])); devState();
+if (!navigator.bluetooth) msg('Web Bluetooth is not available in this browser. Use Chrome/Edge on desktop or Android (Bluefy on iPhone), over https or localhost.');
+}
+</script>
+</body>
+</html>
